@@ -21,39 +21,39 @@ def close(con):
     con.close()
 
 
-def get_annotations(cur_notes, cur_books):
+def get_highlights(cur_notes, cur_books):
     query = 'SELECT * FROM ZAEANNOTATION WHERE ZANNOTATIONSELECTEDTEXT IS NOT NULL'
     cur_notes.execute(query)
     notes = cur_notes.fetchall()
-    annotations = {}
+    highlights = {}
     for note in notes:
         query = 'SELECT * FROM ZBKLIBRARYASSET WHERE ZASSETID={}'.format(
             note['ZANNOTATIONASSETID']
         )
         cur_books.execute(query)
         book = cur_books.fetchone()
-        annotations[note['Z_PK']] = {
+        highlights[note['Z_PK']] = {
             'book_id': note['ZANNOTATIONASSETID'],
             'title': book['ZTITLE'],
             'author': book['ZAUTHOR'],
             'text': note['ZANNOTATIONSELECTEDTEXT']
         }
-    return annotations
+    return highlights
 
 
-def get_annotations(cur_notes, cur_books, book_id):
+def get_highlights(cur_notes, cur_books, book_id):
     query = 'SELECT * FROM ZAEANNOTATION WHERE \
         ZANNOTATIONSELECTEDTEXT IS NOT NULL AND \
         ZANNOTATIONASSETID={}'.format(book_id)
     cur_notes.execute(query)
     notes = cur_notes.fetchall()
-    annotations = {}
+    highlights = {}
     for note in notes:
-        annotations[note['Z_PK']] = {
+        highlights[note['Z_PK']] = {
             'book_id': note['ZANNOTATIONASSETID'],
             'text': note['ZANNOTATIONSELECTEDTEXT']
         }
-    return annotations
+    return highlights
 
 
 def get_book(cur, id):
@@ -92,15 +92,15 @@ def main():
     shutil.copyfile(books_db, temp_books_db) # Achtung!
     con_notes, cur_notes = connect(temp_notes_db)
     con_books, cur_books = connect(temp_books_db)
-    # Print annotations grouped by book
+    # Print highlights grouped by book
     books = get_books(cur_books)
     book_ids = [k for k, v in books.items()]
     for book_id in book_ids:
-        annotations = get_annotations(cur_notes, cur_books, book_id)
-        if annotations != {}:
+        highlights = get_highlights(cur_notes, cur_books, book_id)
+        if highlights != {}:
             print('# {}\n'.format(books[book_id]['title']))
-            for annotation in [v['text'] for k, v in annotations.items()]:
-                print('{}\n\n---\n\n'.format(annotation))
+            for highlight in [v['text'] for k, v in highlights.items()]:
+                print('{}\n\n---\n\n'.format(highlight))
     close(con_notes)
     close(con_books)
 
