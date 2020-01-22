@@ -22,7 +22,7 @@ def close(con):
 
 
 def get_annotations(cur_notes, cur_books):
-    query = 'SELECT * FROM ZAEANNOTATION WHERE ZANNOTATIONREPRESENTATIVETEXT IS NOT NULL'
+    query = 'SELECT * FROM ZAEANNOTATION WHERE ZANNOTATIONSELECTEDTEXT IS NOT NULL'
     cur_notes.execute(query)
     notes = cur_notes.fetchall()
     annotations = {}
@@ -36,14 +36,14 @@ def get_annotations(cur_notes, cur_books):
             'book_id': note['ZANNOTATIONASSETID'],
             'title': book['ZTITLE'],
             'author': book['ZAUTHOR'],
-            'text': note['ZANNOTATIONREPRESENTATIVETEXT']
+            'text': note['ZANNOTATIONSELECTEDTEXT']
         }
     return annotations
 
 
 def get_annotations(cur_notes, cur_books, book_id):
     query = 'SELECT * FROM ZAEANNOTATION WHERE \
-        ZANNOTATIONREPRESENTATIVETEXT IS NOT NULL AND \
+        ZANNOTATIONSELECTEDTEXT IS NOT NULL AND \
         ZANNOTATIONASSETID={}'.format(book_id)
     cur_notes.execute(query)
     notes = cur_notes.fetchall()
@@ -51,7 +51,7 @@ def get_annotations(cur_notes, cur_books, book_id):
     for note in notes:
         annotations[note['Z_PK']] = {
             'book_id': note['ZANNOTATIONASSETID'],
-            'text': note['ZANNOTATIONREPRESENTATIVETEXT']
+            'text': note['ZANNOTATIONSELECTEDTEXT']
         }
     return annotations
 
