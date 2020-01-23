@@ -27,24 +27,29 @@ def get_highlights(cur_annotations, cur_books):
         ZANNOTATIONSELECTEDTEXT as text,\
         ZANNOTATIONASSETID as book_id,\
         ZANNOTATIONSTYLE as style,\
-        datetime(ZANNOTATIONMODIFICATIONDATE+978307200, "unixepoch") as last_modified\
+        datetime(ZANNOTATIONMODIFICATIONDATE+978307200, "unixepoch", "localtime") as last_modified\
         FROM\
         ZAEANNOTATION\
         WHERE\
-        ZANNOTATIONSELECTEDTEXT IS NOT NULL'
+        ZANNOTATIONSELECTEDTEXT IS NOT NULL\
+        ORDER BY last_modified ASC'
     cur_annotations.execute(query)
     annotations = cur_annotations.fetchall()
     highlights = {}
     for annotation in annotations:
-        query = 'SELECT * FROM ZBKLIBRARYASSET WHERE ZASSETID={}'.format(
-            annotation['book_id']
-        )
+        query = 'SELECT\
+            ZTITLE as title,\
+            ZAUTHOR as author\
+            FROM\
+            ZBKLIBRARYASSET\
+            WHERE\
+            ZASSETID={}'.format(annotation['book_id'])
         cur_books.execute(query)
         book = cur_books.fetchone()
         highlights[annotation['id']] = {
             'book_id': annotation['book_id'],
-            'title': book['ZTITLE'],
-            'author': book['ZAUTHOR'],
+            'title': book['title'],
+            'author': book['author'],
             'text': annotation['text'],
             'last_modified': annotation['last_modified'],
             'style': annotation['style']
@@ -56,9 +61,8 @@ def get_highlights(cur_annotations, cur_books, book_id):
     query = 'SELECT\
         Z_PK as id,\
         ZANNOTATIONSELECTEDTEXT as text,\
-        ZANNOTATIONASSETID as book_id,\
         ZANNOTATIONSTYLE as style,\
-        datetime(ZANNOTATIONMODIFICATIONDATE+978307200, "unixepoch") as last_modified\
+        datetime(ZANNOTATIONMODIFICATIONDATE+978307200, "unixepoch", "localtime") as last_modified\
         FROM\
         ZAEANNOTATION\
         WHERE\
@@ -70,7 +74,7 @@ def get_highlights(cur_annotations, cur_books, book_id):
     highlights = {}
     for annotation in annotations:
         highlights[annotation['id']] = {
-            'book_id': annotation['book_id'],
+            'book_id': book_id,
             'text': annotation['text'],
             'last_modified': annotation['last_modified'],
             'style': annotation['style']
@@ -79,24 +83,34 @@ def get_highlights(cur_annotations, cur_books, book_id):
 
 
 def get_book(cur, id):
-    query = 'SELECT * FROM ZBKLIBRARYASSET WHERE ZASSETID={}'.format(id)
+    query = 'SELECT\
+        ZTITLE as title,\
+        ZAUTHOR as author\
+        FROM\
+        ZBKLIBRARYASSET\
+        WHERE\
+        ZASSETID={}'.format(id)
     cur.execute(query)
     row = cur.fetchone()
     return {
-        'title': row['ZTITLE'],
-        'author': row['ZAUTHOR'],
+        'title': row['title'],
+        'author': row['author'],
     }
 
 
 def get_books(cur):
-    query = 'SELECT * FROM ZBKLIBRARYASSET'
+    query = 'SELECT\
+        ZASSETID as book_id,\
+        ZTITLE as title,\
+        ZAUTHOR as author\
+        FROM ZBKLIBRARYASSET'
     cur.execute(query)
     rows = cur.fetchall()
     books = {}
     for row in rows:
-        books[row['ZASSETID']] = {
-            'title': row['ZTITLE'],
-            'author': row['ZAUTHOR'],
+        books[row['book_id']] = {
+            'title': row['title'],
+            'author': row['author'],
         }
     return books
 
