@@ -44,6 +44,23 @@ def get_highlights(cur_annotations, cur_books):
     return highlights
 
 
+def get_highlights_2(cur):
+    query = ('SELECT Z_PK as id, ZANNOTATIONSELECTEDTEXT as text, '
+             'ZANNOTATIONASSETID as book_id, ZANNOTATIONSTYLE as style, '
+             'ZANNOTATIONCREATIONDATE as created, '
+             'ZANNOTATIONMODIFICATIONDATE as last_modified '
+             'FROM ZAEANNOTATION '
+             'WHERE ZANNOTATIONSELECTEDTEXT IS NOT NULL '
+             'ORDER BY last_modified ASC')
+    cur.execute(query)
+    highlights = cur.fetchall()
+    return highlights
+
+
+def get_notes(cur_annotations):
+    pass
+
+
 def get_book(cur, id):
     query = ('SELECT ZTITLE as title, ZAUTHOR as author '
              'FROM ZBKLIBRARYASSET '
@@ -51,6 +68,59 @@ def get_book(cur, id):
     cur.execute(query)
     return cur.fetchone()
 
+
+def dump_db():
+    temp_dir = tempfile.gettempdir()
+    path = 'Library/Containers/com.apple.iBooksX/Data/Documents'
+
+    # Connect to the annotations database
+    a_db_name = 'AEAnnotation_v10312011_1727_local.sqlite'
+    a_db = os.path.join(HOME, path, 'AEAnnotation', a_db_name)
+    a_db_temp = os.path.join(temp_dir, 'a_db_temp.sqlite')
+    shutil.copyfile(a_db, a_db_temp) # Achtung!
+    con_a, cur_a = connect(a_db_temp)
+
+    # Connect to the library database
+    b_db_name = 'BKLibrary-1-091020131601.sqlite'
+    b_db = os.path.join(HOME, path, 'BKLibrary', b_db_name)
+    b_db_temp= os.path.join(temp_dir, 'b_db_temp.sqlite')
+    shutil.copyfile(b_db, b_db_temp) # Achtung!
+    con_b, cur_b = connect(b_db_temp)
+
+    # Create an output database
+    output_db_name = 'annotations.sqlite'
+    output_db = os.path.join(HOME, 'Desktop', output_db_name)
+    con_o = sqlite3.connect(output_db)
+    cur_o = con_o.cursor()
+    query = ('CREATE TABLE highlights ('
+            'id INTEGER PRIMARY KEY AUTOINCREMENT, '
+            'book_id VARCHAR, '
+            'title VARCHAR, '
+            'author VARCHAR, '
+            'text VARCHAR, '
+            'created TIMESTAMP, '
+            'last_modified TIMESTAMP, '
+            'style INTEGER)')
+    cur_o.execute(query)
+
+    # Insert data into the output database
+    highlights = get_highlights_2(cur_a)
+    for highlight in highlights:
+        book = get_book(cur_b, highlight['book_id'])
+        query = ('INSERT INTO highlights '
+                 '(book_id, title, author, text, created, last_modified, style) '
+                 'VALUES ("{}", "{}", "{}", "{}", "{}", "{}", "{}")'.format(
+                    highlight['book_id'],
+                    book['title'],
+                    book['author'],
+                    highlight['text'],
+                    highlight['created'],
+                    highlight['last_modified'],
+                    highlight['style']))
+        cur_o.execute(query)
+    con_o.commit()
+    con_o.close()
+    
 
 def main():
     path = 'Library/Containers/com.apple.iBooksX/Data/Documents'
