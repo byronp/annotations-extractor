@@ -17,7 +17,7 @@ def connect(db):
     return con, cur
 
 
-def get_highlights(cur):
+def extract_highlights(cur):
     query = ('SELECT Z_PK as id, ZANNOTATIONSELECTEDTEXT as text, '
              'ZANNOTATIONASSETID as book_id, ZANNOTATIONSTYLE as style, '
              'ZANNOTATIONCREATIONDATE as created, '
@@ -30,11 +30,11 @@ def get_highlights(cur):
     return highlights
 
 
-def get_notes(cur_annotations):
+def extract_notes(cur_annotations):
     pass
 
 
-def get_book(cur, id):
+def extract_book(cur, id):
     query = ('SELECT ZTITLE as title, ZAUTHOR as author '
              'FROM ZBKLIBRARYASSET '
              'WHERE ZASSETID={}').format(id)
@@ -80,9 +80,9 @@ def initialize():
     cur_o.execute(query)
 
     # Insert data into the output database
-    highlights = get_highlights(cur_a)
+    highlights = extract_highlights(cur_a)
     for highlight in highlights:
-        book = get_book(cur_b, highlight['book_id'])
+        book = extract_book(cur_b, highlight['book_id'])
         query = ('INSERT INTO highlights '
                  '(book_id, title, author, text, created, last_modified, style) '
                  'VALUES ("{}", "{}", "{}", "{}", "{}", "{}", "{}")'.format(
@@ -99,7 +99,6 @@ def initialize():
     
 
 def print_highlights():
-    initialize()
     annotations_db_name = 'annotations.sqlite'
     annotations_db = os.path.join(PROJECT_ROOT, 'data', annotations_db_name)
     con, cur = connect(annotations_db)
@@ -127,4 +126,5 @@ def print_highlights():
 
 
 if __name__ == '__main__':
+    initialize()
     print_highlights()
