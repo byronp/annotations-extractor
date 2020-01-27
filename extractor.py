@@ -10,95 +10,101 @@ PROJECT_ROOT = os.path.abspath(os.path.dirname(__file__))
 
 
 def connect(db):
-    # Connects to a SQLite database.
-    con = sqlite3.connect(db)
-    con.row_factory = sqlite3.Row
-    cur = con.cursor()
-    return con, cur
+        '''Connect to a SQLite database.'''
+        con = sqlite3.connect(db)
+        con.row_factory = sqlite3.Row
+        cur = con.cursor()
+        return con, cur
 
 
-def extract_highlights(cur):
-    query = ('SELECT Z_PK as id, ZANNOTATIONSELECTEDTEXT as text, '
-             'ZANNOTATIONASSETID as book_id, ZANNOTATIONSTYLE as style, '
-             'ZANNOTATIONCREATIONDATE as created, '
-             'ZANNOTATIONMODIFICATIONDATE as last_modified '
-             'FROM ZAEANNOTATION '
-             'WHERE ZANNOTATIONSELECTEDTEXT IS NOT NULL '
-             'ORDER BY last_modified ASC')
-    cur.execute(query)
-    highlights = cur.fetchall()
-    return highlights
+def preprocess():
+    '''Export relevant columns from Apple Books databases to a new database.'''
 
+    def extract_highlights(cur):
+        '''Extract highlights.'''
+        query = ('SELECT Z_PK as id, ZANNOTATIONSELECTEDTEXT as text, '
+                'ZANNOTATIONASSETID as book_id, ZANNOTATIONSTYLE as style, '
+                'ZANNOTATIONCREATIONDATE as created, '
+                'ZANNOTATIONMODIFICATIONDATE as last_modified '
+                'FROM ZAEANNOTATION '
+                'WHERE ZANNOTATIONSELECTEDTEXT IS NOT NULL '
+                'ORDER BY last_modified ASC')
+        cur.execute(query)
+        highlights = cur.fetchall()
+        return highlights
 
-def extract_notes(cur_annotations):
-    pass
+    def extract_notes(cur_annotations):
+        '''Extract notes.'''
+        pass
 
+    def extract_book(cur, id):
+        '''Extract book by id.'''
+        query = ('SELECT ZTITLE as title, ZAUTHOR as author '
+                'FROM ZBKLIBRARYASSET '
+                'WHERE ZASSETID={}').format(id)
+        cur.execute(query)
+        return cur.fetchone()
 
-def extract_book(cur, id):
-    query = ('SELECT ZTITLE as title, ZAUTHOR as author '
-             'FROM ZBKLIBRARYASSET '
-             'WHERE ZASSETID={}').format(id)
-    cur.execute(query)
-    return cur.fetchone()
+    def initialize():
+        '''Connect to Apple Books databases and saves data in a new data base.'''
 
+        temp_dir = tempfile.gettempdir()
+        path = 'Library/Containers/com.apple.iBooksX/Data/Documents'
 
-def initialize():
-    temp_dir = tempfile.gettempdir()
-    path = 'Library/Containers/com.apple.iBooksX/Data/Documents'
+        # Connect to the annotations database
+        a_db_name = 'AEAnnotation_v10312011_1727_local.sqlite'
+        a_db = os.path.join(HOME, path, 'AEAnnotation', a_db_name)
+        a_db_temp = os.path.join(temp_dir, 'a_db_temp.sqlite')
+        shutil.copyfile(a_db, a_db_temp) # Achtung!
+        con_a, cur_a = connect(a_db_temp)
 
-    # Connect to the annotations database
-    a_db_name = 'AEAnnotation_v10312011_1727_local.sqlite'
-    a_db = os.path.join(HOME, path, 'AEAnnotation', a_db_name)
-    a_db_temp = os.path.join(temp_dir, 'a_db_temp.sqlite')
-    shutil.copyfile(a_db, a_db_temp) # Achtung!
-    con_a, cur_a = connect(a_db_temp)
+        # Connect to the library database
+        b_db_name = 'BKLibrary-1-091020131601.sqlite'
+        b_db = os.path.join(HOME, path, 'BKLibrary', b_db_name)
+        b_db_temp= os.path.join(temp_dir, 'b_db_temp.sqlite')
+        shutil.copyfile(b_db, b_db_temp) # Achtung!
+        con_b, cur_b = connect(b_db_temp)
 
-    # Connect to the library database
-    b_db_name = 'BKLibrary-1-091020131601.sqlite'
-    b_db = os.path.join(HOME, path, 'BKLibrary', b_db_name)
-    b_db_temp= os.path.join(temp_dir, 'b_db_temp.sqlite')
-    shutil.copyfile(b_db, b_db_temp) # Achtung!
-    con_b, cur_b = connect(b_db_temp)
-
-    # Create an output database (delete existing one)
-    output_db_name = 'annotations.sqlite'
-    output_db = os.path.join(PROJECT_ROOT, 'data', output_db_name)
-    print(output_db)
-    if os.path.isfile(output_db):
-        os.remove(output_db)
-    con_o = sqlite3.connect(output_db)
-    cur_o = con_o.cursor()
-    query = ('CREATE TABLE IF NOT EXISTS highlights ('
-            'id INTEGER PRIMARY KEY AUTOINCREMENT, '
-            'book_id VARCHAR, '
-            'title VARCHAR, '
-            'author VARCHAR, '
-            'text VARCHAR, '
-            'created TIMESTAMP, '
-            'last_modified TIMESTAMP, '
-            'style INTEGER)')
-    cur_o.execute(query)
-
-    # Insert data into the output database
-    highlights = extract_highlights(cur_a)
-    for highlight in highlights:
-        book = extract_book(cur_b, highlight['book_id'])
-        query = ('INSERT INTO highlights '
-                 '(book_id, title, author, text, created, last_modified, style) '
-                 'VALUES ("{}", "{}", "{}", "{}", "{}", "{}", "{}")'.format(
-                    highlight['book_id'],
-                    book['title'],
-                    book['author'],
-                    highlight['text'],
-                    highlight['created'],
-                    highlight['last_modified'],
-                    highlight['style']))
+        # Create an output database (delete existing one)
+        output_db_name = 'annotations.sqlite'
+        output_db = os.path.join(PROJECT_ROOT, 'data', output_db_name)
+        print(output_db)
+        if os.path.isfile(output_db):
+            os.remove(output_db)
+        con_o = sqlite3.connect(output_db)
+        cur_o = con_o.cursor()
+        query = ('CREATE TABLE IF NOT EXISTS highlights ('
+                'id INTEGER PRIMARY KEY AUTOINCREMENT, '
+                'book_id VARCHAR, '
+                'title VARCHAR, '
+                'author VARCHAR, '
+                'text VARCHAR, '
+                'created TIMESTAMP, '
+                'last_modified TIMESTAMP, '
+                'style INTEGER)')
         cur_o.execute(query)
-    con_o.commit()
-    con_o.close()
+
+        # Insert data into the output database
+        highlights = extract_highlights(cur_a)
+        for highlight in highlights:
+            book = extract_book(cur_b, highlight['book_id'])
+            query = ('INSERT INTO highlights '
+                    '(book_id, title, author, text, created, last_modified, style) '
+                    'VALUES ("{}", "{}", "{}", "{}", "{}", "{}", "{}")'.format(
+                        highlight['book_id'],
+                        book['title'],
+                        book['author'],
+                        highlight['text'],
+                        highlight['created'],
+                        highlight['last_modified'],
+                        highlight['style']))
+            cur_o.execute(query)
+        con_o.commit()
+        con_o.close()
     
 
 def print_highlights(book_id=None):
+    '''Print highlights.'''
     annotations_db_name = 'annotations.sqlite'
     annotations_db = os.path.join(PROJECT_ROOT, 'data', annotations_db_name)
     con, cur = connect(annotations_db)
@@ -134,5 +140,5 @@ def print_highlights(book_id=None):
 
 
 if __name__ == '__main__':
-    initialize()
+    preprocess()
     print_highlights()
