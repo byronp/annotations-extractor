@@ -98,16 +98,24 @@ def initialize():
     con_o.close()
     
 
-def print_highlights():
+def print_highlights(book_id=None):
     annotations_db_name = 'annotations.sqlite'
     annotations_db = os.path.join(PROJECT_ROOT, 'data', annotations_db_name)
     con, cur = connect(annotations_db)
     # Print all highlights with metadata
-    query = ('SELECT title, author, text, style, '
-             'datetime(created + 978307200, "unixepoch", "localtime") as created, '
-             'datetime(last_modified + 978307200, "unixepoch", "localtime") as last_modified '
-             'FROM highlights '
-             'ORDER BY created')
+    if book_id == None:
+        query = ('SELECT title, author, text, style, '
+                 'datetime(created + 978307200, "unixepoch", "localtime") as created, '
+                 'datetime(last_modified + 978307200, "unixepoch", "localtime") as last_modified '
+                 'FROM highlights '
+                 'ORDER BY created')
+    else:
+        query = ('SELECT title, author, text, style, '
+                 'datetime(created + 978307200, "unixepoch", "localtime") as created, '
+                 'datetime(last_modified + 978307200, "unixepoch", "localtime") as last_modified '
+                 'FROM highlights '
+                 'WHERE book_id="{}" '
+                 'ORDER BY created'.format(book_id))
     cur.execute(query)
     highlights = cur.fetchall()
     style = {0:'Underline', 1:'Green', 2:'Blue', 3:'Yellow', 4:'Pink', 5:'Purple'}
