@@ -98,7 +98,7 @@ def initialize():
     con_o.close()
     
 
-def main():
+def print_highlights():
     initialize()
     annotations_db_name = 'annotations.sqlite'
     annotations_db = os.path.join(PROJECT_ROOT, 'data', annotations_db_name)
@@ -127,4 +127,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    print_highlights()
