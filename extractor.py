@@ -33,9 +33,18 @@ def preprocess():
         highlights = cur.fetchall()
         return highlights
 
-    def extract_notes(cur_annotations):
+    def extract_notes(cur):
         '''Extract notes.'''
-        pass
+        query = ('SELECT Z_PK as id, ZANNOTATIONNOTE as text, '
+                'ZANNOTATIONASSETID as book_id, '
+                'ZANNOTATIONCREATIONDATE as created, '
+                'ZANNOTATIONMODIFICATIONDATE as last_modified '
+                'FROM ZAEANNOTATION '
+                'WHERE ZANNOTATIONNOTE NOT LIKE "" '
+                'ORDER BY last_modified ASC')
+        cur.execute(query)
+        notes = cur.fetchall()
+        return notes
 
     def extract_book(cur, id):
         '''Extract book by id.'''
@@ -45,62 +54,91 @@ def preprocess():
         cur.execute(query)
         return cur.fetchone()
 
-    def initialize():
-        '''Connect to Apple Books databases and saves data in a new data base.'''
+    #
+    # Connect to Apple Books databases and save data in a new data base.
+    #
 
-        temp_dir = tempfile.gettempdir()
-        path = 'Library/Containers/com.apple.iBooksX/Data/Documents'
+    temp_dir = tempfile.gettempdir()
+    path = 'Library/Containers/com.apple.iBooksX/Data/Documents'
 
-        # Connect to the annotations database
-        a_db_name = 'AEAnnotation_v10312011_1727_local.sqlite'
-        a_db = os.path.join(HOME, path, 'AEAnnotation', a_db_name)
-        a_db_temp = os.path.join(temp_dir, 'a_db_temp.sqlite')
-        shutil.copyfile(a_db, a_db_temp) # Achtung!
-        con_a, cur_a = connect(a_db_temp)
+    # Connect to the annotations database
+    a_db_name = 'AEAnnotation_v10312011_1727_local.sqlite'
+    a_db = os.path.join(HOME, path, 'AEAnnotation', a_db_name)
+    a_db_temp = os.path.join(temp_dir, 'a_db_temp.sqlite')
+    shutil.copyfile(a_db, a_db_temp) # Achtung!
+    con_a, cur_a = connect(a_db_temp)
 
-        # Connect to the library database
-        b_db_name = 'BKLibrary-1-091020131601.sqlite'
-        b_db = os.path.join(HOME, path, 'BKLibrary', b_db_name)
-        b_db_temp= os.path.join(temp_dir, 'b_db_temp.sqlite')
-        shutil.copyfile(b_db, b_db_temp) # Achtung!
-        con_b, cur_b = connect(b_db_temp)
+    # Connect to the library database
+    b_db_name = 'BKLibrary-1-091020131601.sqlite'
+    b_db = os.path.join(HOME, path, 'BKLibrary', b_db_name)
+    b_db_temp= os.path.join(temp_dir, 'b_db_temp.sqlite')
+    shutil.copyfile(b_db, b_db_temp) # Achtung!
+    con_b, cur_b = connect(b_db_temp)
 
-        # Create an output database (delete existing one)
-        output_db_name = 'annotations.sqlite'
-        output_db = os.path.join(PROJECT_ROOT, 'data', output_db_name)
-        print(output_db)
-        if os.path.isfile(output_db):
-            os.remove(output_db)
-        con_o = sqlite3.connect(output_db)
-        cur_o = con_o.cursor()
-        query = ('CREATE TABLE IF NOT EXISTS highlights ('
-                'id INTEGER PRIMARY KEY AUTOINCREMENT, '
-                'book_id VARCHAR, '
-                'title VARCHAR, '
-                'author VARCHAR, '
-                'text VARCHAR, '
-                'created TIMESTAMP, '
-                'last_modified TIMESTAMP, '
-                'style INTEGER)')
+    # Create an output database (delete existing one)
+    output_db_name = 'annotations.sqlite'
+    output_db = os.path.join(PROJECT_ROOT, 'data', output_db_name)
+    if os.path.isfile(output_db):
+        os.remove(output_db)
+    con_o = sqlite3.connect(output_db)
+    cur_o = con_o.cursor()
+
+    # Create a table for highlights
+    query = ('CREATE TABLE IF NOT EXISTS highlights ('
+            'id INTEGER PRIMARY KEY AUTOINCREMENT, '
+            'book_id VARCHAR, '
+            'title VARCHAR, '
+            'author VARCHAR, '
+            'text VARCHAR, '
+            'created TIMESTAMP, '
+            'last_modified TIMESTAMP, '
+            'style INTEGER)')
+    cur_o.execute(query)
+
+    # Insert data into the highlights table
+    highlights = extract_highlights(cur_a)
+    for highlight in highlights:
+        book = extract_book(cur_b, highlight['book_id'])
+        query = ('INSERT INTO highlights '
+                 '(book_id, title, author, text, created, last_modified, style) '
+                 'VALUES ("{}", "{}", "{}", "{}", "{}", "{}", "{}")'.format(
+                    highlight['book_id'],
+                    book['title'],
+                    book['author'],
+                    highlight['text'],
+                    highlight['created'],
+                    highlight['last_modified'],
+                    highlight['style']))
         cur_o.execute(query)
+    con_o.commit()
 
-        # Insert data into the output database
-        highlights = extract_highlights(cur_a)
-        for highlight in highlights:
-            book = extract_book(cur_b, highlight['book_id'])
-            query = ('INSERT INTO highlights '
-                    '(book_id, title, author, text, created, last_modified, style) '
-                    'VALUES ("{}", "{}", "{}", "{}", "{}", "{}", "{}")'.format(
-                        highlight['book_id'],
-                        book['title'],
-                        book['author'],
-                        highlight['text'],
-                        highlight['created'],
-                        highlight['last_modified'],
-                        highlight['style']))
-            cur_o.execute(query)
-        con_o.commit()
-        con_o.close()
+    # Create a table for notes
+    query = ('CREATE TABLE IF NOT EXISTS notes ('
+            'id INTEGER PRIMARY KEY AUTOINCREMENT, '
+            'book_id VARCHAR, '
+            'title VARCHAR, '
+            'author VARCHAR, '
+            'text VARCHAR, '
+            'created TIMESTAMP, '
+            'last_modified TIMESTAMP)')
+    cur_o.execute(query)
+
+    # Insert data into the notes table
+    notes = extract_notes(cur_a)
+    for note in notes:
+        book = extract_book(cur_b, note['book_id'])
+        query = ('INSERT INTO notes '
+                 '(book_id, title, author, text, created, last_modified) '
+                 'VALUES ("{}", "{}", "{}", "{}", "{}", "{}")'.format(
+                    note['book_id'],
+                    book['title'],
+                    book['author'],
+                    note['text'],
+                    note['created'],
+                    note['last_modified']))
+        cur_o.execute(query)
+    con_o.commit()
+    con_o.close()
     
 
 def print_highlights(book_id=None):
